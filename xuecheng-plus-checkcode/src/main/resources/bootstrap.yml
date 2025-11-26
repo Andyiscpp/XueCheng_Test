@@ -1,3 +1,5 @@
+server:
+  port: 63075
 spring:
   application:
     name: checkcode
