@@ -10,12 +10,12 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
-
+import com.spring4all.swagger.EnableSwagger2Doc;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-
+@EnableSwagger2Doc
 @EnableFeignClients(basePackages = "com.xuecheng.ucenter.feignclient")
 @SpringBootApplication
 public class AuthApplication {
