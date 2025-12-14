@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="ContentServiceTest" default="all" basedir="." xmlns:jacoco="antlib:org.jacoco.ant">
+
+    <property name="src.dir" value="src/main/java"/>
+    <property name="resources.dir" value="src/main/resources"/>
+    <property name="test.dir" value="src/test/java"/>
+    <property name="test.resources.dir" value="src/test/resources"/>
+    <property name="lib.dir" value="lib"/>
+
+    <property name="build.dir" value="build"/>
+    <property name="classes.dir" value="${build.dir}/classes"/>
+    <property name="test.classes.dir" value="${build.dir}/test-classes"/>
+
+    <property name="report.dir" value="report"/>
+    <property name="junit.report.dir" value="${report.dir}/junit"/>
+    <property name="coverage.report.dir" value="${report.dir}/coverage"/>
+
+    <path id="classpath">
+        <fileset dir="${lib.dir}">
+            <include name="*.jar"/>
+        </fileset>
+    </path>
+
+    <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml">
+        <classpath path="${lib.dir}/jacocoant.jar"/>
+    </taskdef>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${report.dir}"/>
+    </target>
+
+    <target name="init">
+        <mkdir dir="${classes.dir}"/>
+        <mkdir dir="${test.classes.dir}"/>
+        <mkdir dir="${junit.report.dir}/xml"/>
+        <mkdir dir="${coverage.report.dir}"/>
+    </target>
+
+    <target name="compile" depends="init">
+        <javac srcdir="${src.dir}" destdir="${classes.dir}" includeantruntime="false" encoding="UTF-8" debug="true">
+            <classpath refid="classpath"/>
+            <compilerarg value="-parameters"/>
+        </javac>
+        <copy todir="${classes.dir}">
+            <fileset dir="${resources.dir}"/>
+        </copy>
+
+        <javac srcdir="${test.dir}" destdir="${test.classes.dir}" includeantruntime="false" encoding="UTF-8" debug="true">
+            <classpath>
+                <path refid="classpath"/>
+                <pathelement location="${classes.dir}"/>
+            </classpath>
+            <compilerarg value="-parameters"/>
+        </javac>
+        <copy todir="${test.classes.dir}">
+            <fileset dir="${test.resources.dir}"/>
+        </copy>
+    </target>
+
+    <target name="test" depends="compile">
+        <echo message="准备 JaCoCo Agent..."/>
+
+        <jacoco:agent property="jacoco.vm.param" destfile="${report.dir}/jacoco.exec" output="file"/>
+
+        <echo message="开始执行 JUnit 5 测试..."/>
+
+        <junitlauncher printsummary="true" haltOnFailure="false">
+            <classpath>
+                <path refid="classpath"/>
+                <pathelement location="${classes.dir}"/>
+                <pathelement location="${test.classes.dir}"/>
+            </classpath>
+
+            <testclasses outputdir="${junit.report.dir}/xml">
+                <fileset dir="${test.classes.dir}">
+                    <include name="**/*Tests.class"/>
+                </fileset>
+
+                <fork>
+                    <jvmarg line="${jacoco.vm.param}"/>
+                </fork>
+
+                <listener type="legacy-xml" sendSysOut="true" sendSysErr="true"/>
+                <listener type="legacy-plain" sendSysOut="true"/>
+            </testclasses>
+        </junitlauncher>
+    </target>
+
+    <target name="report" depends="test">
+        <junitreport todir="${junit.report.dir}">
+            <fileset dir="${junit.report.dir}/xml">
+                <include name="TEST-*.xml"/>
+            </fileset>
+            <report format="frames" todir="${junit.report.dir}/html"/>
+        </junitreport>
+        <echo message="JUnit 测试报告生成完毕: ${junit.report.dir}/html/index.html"/>
+
+        <jacoco:report>
+            <executiondata>
+                <file file="${report.dir}/jacoco.exec"/>
+            </executiondata>
+            <structure name="Content Service Coverage">
+                <classfiles>
+                    <fileset dir="${classes.dir}"/>
+                </classfiles>
+                <sourcefiles encoding="UTF-8">
+                    <fileset dir="${src.dir}"/>
+                </sourcefiles>
+            </structure>
+            <html destdir="${coverage.report.dir}"/>
+        </jacoco:report>
+        <echo message="JaCoCo 覆盖率报告生成完毕: ${coverage.report.dir}/index.html"/>
+    </target>
+
+    <target name="all" depends="clean, compile, test, report"/>
+
+</project>

@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CourseBaseInfoServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Content Service Coverage</a> &gt; <a href="index.source.html" class="el_package">com.xuecheng.content.service.impl</a> &gt; <span class="el_source">CourseBaseInfoServiceImpl.java</span></div><h1>CourseBaseInfoServiceImpl.java</h1><pre class="source lang-java linenums">package com.xuecheng.content.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xuecheng.base.exception.XueChengPlusException;
+import com.xuecheng.base.model.PageParams;
+import com.xuecheng.base.model.PageResult;
+import com.xuecheng.content.mapper.CourseBaseMapper;
+import com.xuecheng.content.mapper.CourseCategoryMapper;
+import com.xuecheng.content.mapper.CourseMarketMapper;
+import com.xuecheng.content.model.dto.AddCourseDto;
+import com.xuecheng.content.model.dto.CourseBaseInfoDto;
+import com.xuecheng.content.model.dto.EditCourseDto;
+import com.xuecheng.content.model.dto.QueryCourseParamsDto;
+import com.xuecheng.content.model.po.CourseBase;
+import com.xuecheng.content.model.po.CourseCategory;
+import com.xuecheng.content.model.po.CourseMarket;
+import com.xuecheng.content.service.CourseBaseInfoService;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resources;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * @author Mr.M
+ * @version 1.0
+ * @description TODO
+ * @date 2023/2/12 10:16
+ */
+<span class="fc" id="L36">@Slf4j</span>
+@Service
+<span class="fc" id="L38">public class CourseBaseInfoServiceImpl implements CourseBaseInfoService {</span>
+    @Autowired
+    CourseBaseMapper courseBaseMapper;
+
+    @Autowired
+    CourseMarketMapper courseMarketMapper;
+
+    @Autowired
+    CourseCategoryMapper courseCategoryMapper;
+
+
+    @Override
+    public PageResult&lt;CourseBase&gt; queryCourseBaseList(Long companyId,PageParams pageParams, QueryCourseParamsDto courseParamsDto) {
+// 【新增】如果传入的查询条件为空，创建一个空对象，防止下面发生空指针异常
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (courseParamsDto == null) {</span>
+<span class="fc" id="L53">            courseParamsDto = new QueryCourseParamsDto();</span>
+        }
+
+        //拼装查询条件
+<span class="fc" id="L57">        LambdaQueryWrapper&lt;CourseBase&gt; queryWrapper = new LambdaQueryWrapper&lt;&gt;();</span>
+        //根据名称模糊查询,在sql中拼接 course_base.name like '%值%'
+<span class="fc" id="L59">        queryWrapper.like(StringUtils.isNotEmpty(courseParamsDto.getCourseName()),CourseBase::getName,courseParamsDto.getCourseName());</span>
+        //根据课程审核状态查询 course_base.audit_status = ?
+<span class="fc" id="L61">        queryWrapper.eq(StringUtils.isNotEmpty(courseParamsDto.getAuditStatus()), CourseBase::getAuditStatus,courseParamsDto.getAuditStatus());</span>
+        //todo:按课程发布状态查询
+        //根据培训机构id拼装查询条件
+<span class="fc" id="L64">        queryWrapper.eq(CourseBase::getCompanyId,companyId);</span>
+
+        //创建page分页参数对象，参数：当前页码，每页记录数
+<span class="fc" id="L67">        Page&lt;CourseBase&gt; page = new Page&lt;&gt;(pageParams.getPageNo(), pageParams.getPageSize());</span>
+        //开始进行分页查询
+<span class="fc" id="L69">        Page&lt;CourseBase&gt; pageResult = courseBaseMapper.selectPage(page, queryWrapper);</span>
+        //数据列表
+<span class="fc" id="L71">        List&lt;CourseBase&gt; items = pageResult.getRecords();</span>
+        //总记录数
+<span class="fc" id="L73">        long total = pageResult.getTotal();</span>
+
+        //List&lt;T&gt; items, long counts, long page, long pageSize
+<span class="fc" id="L76">        PageResult&lt;CourseBase&gt; courseBasePageResult = new PageResult&lt;CourseBase&gt;(items,total,pageParams.getPageNo(), pageParams.getPageSize());</span>
+<span class="fc" id="L77">        return  courseBasePageResult;</span>
+    }
+
+    @Transactional
+    @Override
+    public CourseBaseInfoDto createCourseBase(Long companyId, AddCourseDto dto){
+
+        //参数的合法性校验
+//        if (StringUtils.isBlank(dto.getName())) {
+////            throw new RuntimeException(&quot;课程名称为空&quot;);
+//            XueChengPlusException.cast(&quot;课程名称为空&quot;);
+//        }
+//
+//        if (StringUtils.isBlank(dto.getMt())) {
+//            throw new RuntimeException(&quot;课程分类为空&quot;);
+//        }
+//
+//        if (StringUtils.isBlank(dto.getSt())) {
+//            throw new RuntimeException(&quot;课程分类为空&quot;);
+//        }
+//
+//        if (StringUtils.isBlank(dto.getGrade())) {
+//            throw new RuntimeException(&quot;课程等级为空&quot;);
+//        }
+//
+//        if (StringUtils.isBlank(dto.getTeachmode())) {
+//            throw new RuntimeException(&quot;教育模式为空&quot;);
+//        }
+//
+//        if (StringUtils.isBlank(dto.getUsers())) {
+//            throw new RuntimeException(&quot;适应人群为空&quot;);
+//        }
+//
+//        if (StringUtils.isBlank(dto.getCharge())) {
+//            throw new RuntimeException(&quot;收费规则为空&quot;);
+//        }
+
+        //向课程基本信息表course_base写入数据
+<span class="nc" id="L115">        CourseBase courseBaseNew = new CourseBase();</span>
+        //将传入的页面的参数放到courseBaseNew对象
+//        courseBaseNew.setName(dto.getName());
+//        courseBaseNew.setDescription(dto.getDescription());
+        //上边的从原始对象中get拿数据向新对象set，比较复杂
+<span class="nc" id="L120">        BeanUtils.copyProperties(dto,courseBaseNew);//只要属性名称一致就可以拷贝</span>
+<span class="nc" id="L121">        courseBaseNew.setCompanyId(companyId);</span>
+<span class="nc" id="L122">        courseBaseNew.setCreateDate(LocalDateTime.now());</span>
+        //审核状态默认为未提交
+<span class="nc" id="L124">        courseBaseNew.setAuditStatus(&quot;202002&quot;);</span>
+        //发布状态为未发布
+<span class="nc" id="L126">        courseBaseNew.setStatus(&quot;203001&quot;);</span>
+        //插入数据库
+<span class="nc" id="L128">        int insert = courseBaseMapper.insert(courseBaseNew);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if(insert&lt;=0){</span>
+<span class="nc" id="L130">            throw new RuntimeException(&quot;添加课程失败&quot;);</span>
+        }
+
+        //向课程营销系courese_market写入数据
+<span class="nc" id="L134">        CourseMarket courseMarketNew = new CourseMarket();</span>
+        //将页面输入的数据拷贝到courseMarketNew
+<span class="nc" id="L136">        BeanUtils.copyProperties(dto,courseMarketNew);</span>
+        //课程的id
+<span class="nc" id="L138">        Long courseId = courseBaseNew.getId();</span>
+<span class="nc" id="L139">        courseMarketNew.setId(courseId);</span>
+        //保存营销信息
+<span class="nc" id="L141">        saveCourseMarket(courseMarketNew);</span>
+        //从数据库查询课程的详细信息，包括两部分
+<span class="nc" id="L143">        CourseBaseInfoDto courseBaseInfo = getCourseBaseInfo(courseId);</span>
+
+
+<span class="nc" id="L146">        return courseBaseInfo;</span>
+    }
+
+    //查询课程信息
+    public CourseBaseInfoDto getCourseBaseInfo(Long courseId){
+
+        //从课程基本信息表查询
+<span class="nc" id="L153">        CourseBase courseBase = courseBaseMapper.selectById(courseId);</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if(courseBase==null){</span>
+<span class="nc" id="L155">            return null;</span>
+        }
+        //从课程营销表查询
+<span class="nc" id="L158">        CourseMarket courseMarket = courseMarketMapper.selectById(courseId);</span>
+
+        //组装在一起
+<span class="nc" id="L161">        CourseBaseInfoDto courseBaseInfoDto = new CourseBaseInfoDto();</span>
+<span class="nc" id="L162">        BeanUtils.copyProperties(courseBase,courseBaseInfoDto);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if(courseMarket!=null){</span>
+<span class="nc" id="L164">            BeanUtils.copyProperties(courseMarket,courseBaseInfoDto);</span>
+        }
+
+        //通过courseCategoryMapper查询分类信息，将分类名称放在courseBaseInfoDto对象
+<span class="nc" id="L168">        CourseCategory mtObj = courseCategoryMapper.selectById(courseBase.getMt());</span>
+<span class="nc" id="L169">        String mtName = mtObj.getName();//大分类名称</span>
+<span class="nc" id="L170">        courseBaseInfoDto.setMtName(mtName);</span>
+<span class="nc" id="L171">        CourseCategory stObj = courseCategoryMapper.selectById(courseBase.getSt());</span>
+<span class="nc" id="L172">        String stName = stObj.getName();//小分类名称</span>
+<span class="nc" id="L173">        courseBaseInfoDto.setStName(stName);</span>
+
+<span class="nc" id="L175">        return courseBaseInfoDto;</span>
+
+    }
+
+    @Override
+    public CourseBaseInfoDto updateCourseBase(Long companyId, EditCourseDto editCourseDto) {
+
+        //拿到课程id
+<span class="nc" id="L183">        Long courseId = editCourseDto.getId();</span>
+        //查询课程信息
+<span class="nc" id="L185">        CourseBase courseBase = courseBaseMapper.selectById(courseId);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if(courseBase == null){</span>
+<span class="nc" id="L187">            XueChengPlusException.cast(&quot;课程不存在&quot;);</span>
+        }
+
+        //数据合法性校验
+        //根据具体的业务逻辑去校验
+        //本机构只能修改本机构的课程
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if(!companyId.equals(courseBase.getCompanyId())){</span>
+<span class="nc" id="L194">            XueChengPlusException.cast(&quot;本机构只能修改本机构的课程&quot;);</span>
+        }
+
+        //封装数据
+<span class="nc" id="L198">        BeanUtils.copyProperties(editCourseDto,courseBase);</span>
+        //修改时间
+<span class="nc" id="L200">        courseBase.setChangeDate(LocalDateTime.now());</span>
+
+        //更新数据库
+<span class="nc" id="L203">        int i = courseBaseMapper.updateById(courseBase);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        if(i&lt;=0){</span>
+<span class="nc" id="L205">            XueChengPlusException.cast(&quot;修改课程失败&quot;);</span>
+        }
+        //更新营销信息
+<span class="nc" id="L208">        CourseMarket courseMarket = new CourseMarket();</span>
+<span class="nc" id="L209">        BeanUtils.copyProperties(editCourseDto,courseMarket);</span>
+
+<span class="nc" id="L211">        saveCourseMarket(courseMarket);</span>
+        //查询课程信息
+<span class="nc" id="L213">        CourseBaseInfoDto courseBaseInfo = getCourseBaseInfo(courseId);</span>
+
+<span class="nc" id="L215">        return courseBaseInfo;</span>
+    }
+
+    //单独写一个方法保存营销信息，逻辑：存在则更新，不存在则添加
+    private int saveCourseMarket(CourseMarket courseMarketNew){
+
+        //参数的合法性校验
+<span class="nc" id="L222">        String charge = courseMarketNew.getCharge();</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if(StringUtils.isEmpty(charge)){</span>
+<span class="nc" id="L224">            throw new RuntimeException(&quot;收费规则为空&quot;);</span>
+        }
+        //如果课程收费，价格没有填写也需要抛出异常
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if(charge.equals(&quot;201001&quot;)){</span>
+<span class="nc bnc" id="L228" title="All 4 branches missed.">           if(courseMarketNew.getPrice() ==null || courseMarketNew.getPrice().floatValue()&lt;=0){</span>
+//               throw new RuntimeException(&quot;课程的价格不能为空并且必须大于0&quot;);
+<span class="nc" id="L230">               XueChengPlusException.cast(&quot;课程的价格不能为空并且必须大于0&quot;);</span>
+           }
+        }
+
+        //从数据库查询营销信息,存在则更新，不存在则添加
+<span class="nc" id="L235">        Long id = courseMarketNew.getId();//主键</span>
+<span class="nc" id="L236">        CourseMarket courseMarket = courseMarketMapper.selectById(id);</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if(courseMarket == null){</span>
+            //插入数据库
+<span class="nc" id="L239">            int insert = courseMarketMapper.insert(courseMarketNew);</span>
+<span class="nc" id="L240">            return insert;</span>
+        }else{
+            //将courseMarketNew拷贝到courseMarket
+<span class="nc" id="L243">            BeanUtils.copyProperties(courseMarketNew,courseMarket);</span>
+<span class="nc" id="L244">            courseMarket.setId(courseMarketNew.getId());</span>
+            //更新
+<span class="nc" id="L246">            int i = courseMarketMapper.updateById(courseMarket);</span>
+<span class="nc" id="L247">            return i;</span>
+        }
+
+
+    }
+
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

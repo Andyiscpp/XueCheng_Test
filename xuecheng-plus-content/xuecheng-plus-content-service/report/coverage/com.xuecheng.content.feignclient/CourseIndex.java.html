@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CourseIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Content Service Coverage</a> &gt; <a href="index.source.html" class="el_package">com.xuecheng.content.feignclient</a> &gt; <span class="el_source">CourseIndex.java</span></div><h1>CourseIndex.java</h1><pre class="source lang-java linenums">package com.xuecheng.content.feignclient;
+
+import com.alibaba.fastjson.annotation.JSONField;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.Data;
+
+import java.io.Serializable;
+import java.time.LocalDateTime;
+
+/**
+ * &lt;p&gt;
+ * 课程索引信息
+ * &lt;/p&gt;
+ *
+ * @author itcast
+ */
+<span class="nc bnc" id="L17" title="All 174 branches missed.">@Data</span>
+public class CourseIndex implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 主键
+     */
+<span class="nc" id="L25">    private Long id;</span>
+
+    /**
+     * 机构ID
+     */
+<span class="nc" id="L30">    private Long companyId;</span>
+
+    /**
+     * 公司名称
+     */
+<span class="nc" id="L35">    private String companyName;</span>
+
+    /**
+     * 课程名称
+     */
+<span class="nc" id="L40">    private String name;</span>
+
+    /**
+     * 适用人群
+     */
+<span class="nc" id="L45">    private String users;</span>
+
+    /**
+     * 标签
+     */
+<span class="nc" id="L50">    private String tags;</span>
+
+
+    /**
+     * 大分类
+     */
+<span class="nc" id="L56">    private String mt;</span>
+
+    /**
+     * 大分类名称
+     */
+<span class="nc" id="L61">    private String mtName;</span>
+
+    /**
+     * 小分类
+     */
+<span class="nc" id="L66">    private String st;</span>
+
+    /**
+     * 小分类名称
+     */
+<span class="nc" id="L71">    private String stName;</span>
+
+
+
+    /**
+     * 课程等级
+     */
+<span class="nc" id="L78">    private String grade;</span>
+
+    /**
+     * 教育模式
+     */
+<span class="nc" id="L83">    private String teachmode;</span>
+    /**
+     * 课程图片
+     */
+<span class="nc" id="L87">    private String pic;</span>
+
+    /**
+     * 课程介绍
+     */
+<span class="nc" id="L92">    private String description;</span>
+
+
+    /**
+     * 发布时间
+     */
+    @JSONField(format=&quot;yyyy-MM-dd HH:mm:ss&quot;)
+    @JsonFormat(pattern = &quot;yyyy-MM-dd HH:mm:ss&quot;)
+<span class="nc" id="L100">    private LocalDateTime createDate;</span>
+
+    /**
+     * 状态
+     */
+<span class="nc" id="L105">    private String status;</span>
+
+    /**
+     * 备注
+     */
+<span class="nc" id="L110">    private String remark;</span>
+
+    /**
+     * 收费规则，对应数据字典--203
+     */
+<span class="nc" id="L115">    private String charge;</span>
+
+    /**
+     * 现价
+     */
+<span class="nc" id="L120">    private Float price;</span>
+    /**
+     * 原价
+     */
+<span class="nc" id="L124">    private Float originalPrice;</span>
+
+    /**
+     * 课程有效期天数
+     */
+<span class="nc" id="L129">    private Integer validDays;</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

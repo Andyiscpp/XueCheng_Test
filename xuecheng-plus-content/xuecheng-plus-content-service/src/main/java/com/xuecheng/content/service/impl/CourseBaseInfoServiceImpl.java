@@ -48,6 +48,10 @@ public class CourseBaseInfoServiceImpl implements CourseBaseInfoService {
 
     @Override
     public PageResult<CourseBase> queryCourseBaseList(Long companyId,PageParams pageParams, QueryCourseParamsDto courseParamsDto) {
+// 【新增】如果传入的查询条件为空，创建一个空对象，防止下面发生空指针异常
+        if (courseParamsDto == null) {
+            courseParamsDto = new QueryCourseParamsDto();
+        }
 
         //拼装查询条件
         LambdaQueryWrapper<CourseBase> queryWrapper = new LambdaQueryWrapper<>();

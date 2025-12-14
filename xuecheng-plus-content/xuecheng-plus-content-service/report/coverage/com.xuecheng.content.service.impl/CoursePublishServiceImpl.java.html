@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CoursePublishServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Content Service Coverage</a> &gt; <a href="index.source.html" class="el_package">com.xuecheng.content.service.impl</a> &gt; <span class="el_source">CoursePublishServiceImpl.java</span></div><h1>CoursePublishServiceImpl.java</h1><pre class="source lang-java linenums">package com.xuecheng.content.service.impl;
+
+import com.alibaba.fastjson.JSON;
+import com.xuecheng.base.exception.CommonError;
+import com.xuecheng.base.exception.XueChengPlusException;
+import com.xuecheng.content.config.MultipartSupportConfig;
+import com.xuecheng.content.feignclient.MediaServiceClient;
+import com.xuecheng.content.mapper.CourseBaseMapper;
+import com.xuecheng.content.mapper.CourseMarketMapper;
+import com.xuecheng.content.mapper.CoursePublishMapper;
+import com.xuecheng.content.mapper.CoursePublishPreMapper;
+import com.xuecheng.content.model.dto.CourseBaseInfoDto;
+import com.xuecheng.content.model.dto.CoursePreviewDto;
+import com.xuecheng.content.model.dto.TeachplanDto;
+import com.xuecheng.content.model.po.CourseBase;
+import com.xuecheng.content.model.po.CourseMarket;
+import com.xuecheng.content.model.po.CoursePublish;
+import com.xuecheng.content.model.po.CoursePublishPre;
+import com.xuecheng.content.service.CourseBaseInfoService;
+import com.xuecheng.content.service.CoursePublishService;
+import com.xuecheng.content.service.TeachplanService;
+import com.xuecheng.messagesdk.model.po.MqMessage;
+import com.xuecheng.messagesdk.service.MqMessageService;
+import freemarker.cache.ClassTemplateLoader;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * @author Mr.M
+ * @version 1.0
+ * @description 课程发布相关接口实现
+ * @date 2023/2/21 10:04
+ */
+<span class="nc" id="L56">@Slf4j</span>
+@Service
+<span class="nc" id="L58">public class CoursePublishServiceImpl implements CoursePublishService {</span>
+
+    @Autowired
+    CourseBaseInfoService courseBaseInfoService;
+
+    @Autowired
+    TeachplanService teachplanService;
+
+    @Autowired
+    CourseBaseMapper courseBaseMapper;
+
+    @Autowired
+    CourseMarketMapper courseMarketMapper;
+
+    @Autowired
+    CoursePublishPreMapper coursePublishPreMapper;
+    @Autowired
+    CoursePublishMapper coursePublishMapper;
+
+    @Autowired
+    MqMessageService mqMessageService;
+    @Autowired
+    MediaServiceClient mediaServiceClient;
+
+    @Autowired
+    RedisTemplate redisTemplate;
+
+    @Autowired
+    RedissonClient redissonClient;
+
+    @Override
+    public CoursePreviewDto getCoursePreviewInfo(Long courseId) {
+<span class="nc" id="L90">        CoursePreviewDto coursePreviewDto = new CoursePreviewDto();</span>
+        //课程基本信息,营销信息
+<span class="nc" id="L92">        CourseBaseInfoDto courseBaseInfo = courseBaseInfoService.getCourseBaseInfo(courseId);</span>
+<span class="nc" id="L93">        coursePreviewDto.setCourseBase(courseBaseInfo);</span>
+        //课程计划信息
+<span class="nc" id="L95">        List&lt;TeachplanDto&gt; teachplanTree = teachplanService.findTeachplanTree(courseId);</span>
+<span class="nc" id="L96">        coursePreviewDto.setTeachplans(teachplanTree);</span>
+
+<span class="nc" id="L98">        return coursePreviewDto;</span>
+    }
+
+    @Transactional
+    @Override
+    public void commitAudit(Long companyId, Long courseId) {
+
+<span class="nc" id="L105">        CourseBaseInfoDto courseBaseInfo = courseBaseInfoService.getCourseBaseInfo(courseId);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (courseBaseInfo == null) {</span>
+<span class="nc" id="L107">            XueChengPlusException.cast(&quot;课程找不到&quot;);</span>
+        }
+        //审核状态
+<span class="nc" id="L110">        String auditStatus = courseBaseInfo.getAuditStatus();</span>
+
+        //如果课程的审核状态为已提交则不允许提交
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (auditStatus.equals(&quot;202003&quot;)) {</span>
+<span class="nc" id="L114">            XueChengPlusException.cast(&quot;课程已提交请等待审核&quot;);</span>
+        }
+        //本机构只能提交本机构的课程
+        //todo:本机构只能提交本机构的课程
+
+        //课程的图片、计划信息没有填写也不允许提交
+<span class="nc" id="L120">        String pic = courseBaseInfo.getPic();</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (StringUtils.isEmpty(pic)) {</span>
+<span class="nc" id="L122">            XueChengPlusException.cast(&quot;请求上传课程图片&quot;);</span>
+        }
+        //查询课程计划
+        //课程计划信息
+<span class="nc" id="L126">        List&lt;TeachplanDto&gt; teachplanTree = teachplanService.findTeachplanTree(courseId);</span>
+<span class="nc bnc" id="L127" title="All 4 branches missed.">        if (teachplanTree == null || teachplanTree.size() == 0) {</span>
+<span class="nc" id="L128">            XueChengPlusException.cast(&quot;请编写课程计划&quot;);</span>
+        }
+
+        //查询到课程基本信息、营销信息、计划等信息插入到课程预发布表
+<span class="nc" id="L132">        CoursePublishPre coursePublishPre = new CoursePublishPre();</span>
+<span class="nc" id="L133">        BeanUtils.copyProperties(courseBaseInfo, coursePublishPre);</span>
+        //设置机构id
+<span class="nc" id="L135">        coursePublishPre.setCompanyId(companyId);</span>
+        //营销信息
+<span class="nc" id="L137">        CourseMarket courseMarket = courseMarketMapper.selectById(courseId);</span>
+        //转json
+<span class="nc" id="L139">        String courseMarketJson = JSON.toJSONString(courseMarket);</span>
+<span class="nc" id="L140">        coursePublishPre.setMarket(courseMarketJson);</span>
+        //计划信息
+        //转json
+<span class="nc" id="L143">        String teachplanTreeJson = JSON.toJSONString(teachplanTree);</span>
+<span class="nc" id="L144">        coursePublishPre.setTeachplan(teachplanTreeJson);</span>
+        //状态为已提交
+<span class="nc" id="L146">        coursePublishPre.setStatus(&quot;202003&quot;);</span>
+        //提交时间
+<span class="nc" id="L148">        coursePublishPre.setCreateDate(LocalDateTime.now());</span>
+        //查询预发布表，如果有记录则更新，没有则插入
+<span class="nc" id="L150">        CoursePublishPre coursePublishPreObj = coursePublishPreMapper.selectById(courseId);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (coursePublishPreObj == null) {</span>
+            //插入
+<span class="nc" id="L153">            coursePublishPreMapper.insert(coursePublishPre);</span>
+        } else {
+            //更新
+<span class="nc" id="L156">            coursePublishPreMapper.updateById(coursePublishPre);</span>
+        }
+
+        //更新课程基本信息表的审核状态为已提交
+<span class="nc" id="L160">        CourseBase courseBase = courseBaseMapper.selectById(courseId);</span>
+<span class="nc" id="L161">        courseBase.setAuditStatus(&quot;202003&quot;);//审核状态为已提交</span>
+
+<span class="nc" id="L163">        courseBaseMapper.updateById(courseBase);</span>
+<span class="nc" id="L164">    }</span>
+
+    @Transactional
+    @Override
+    public void publish(Long companyId, Long courseId) {
+
+        //查询预发布表
+<span class="nc" id="L171">        CoursePublishPre coursePublishPre = coursePublishPreMapper.selectById(courseId);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (coursePublishPre == null) {</span>
+<span class="nc" id="L173">            XueChengPlusException.cast(&quot;课程没有审核记录，无法发布&quot;);</span>
+        }
+        //状态
+<span class="nc" id="L176">        String status = coursePublishPre.getStatus();</span>
+        //课程如果没有审核通过不允许发布
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (!status.equals(&quot;202004&quot;)) {</span>
+<span class="nc" id="L179">            XueChengPlusException.cast(&quot;课程没有审核通过不允许发布&quot;);</span>
+        }
+
+        //向课程发布表写入数据
+<span class="nc" id="L183">        CoursePublish coursePublish = new CoursePublish();</span>
+<span class="nc" id="L184">        BeanUtils.copyProperties(coursePublishPre, coursePublish);</span>
+        //先查询课程发布，如果有则更新，没有再添加
+<span class="nc" id="L186">        CoursePublish coursePublishObj = coursePublishMapper.selectById(courseId);</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (coursePublishObj == null) {</span>
+<span class="nc" id="L188">            coursePublishMapper.insert(coursePublish);</span>
+        } else {
+<span class="nc" id="L190">            coursePublishMapper.updateById(coursePublish);</span>
+        }
+
+        //向消息表写入数据
+//        mqMessageService.addMessage(&quot;course_publish&quot;,String.valueOf(courseId),null,null);
+<span class="nc" id="L195">        saveCoursePublishMessage(courseId);</span>
+
+        //将预发布表数据删除
+<span class="nc" id="L198">        coursePublishPreMapper.deleteById(courseId);</span>
+
+<span class="nc" id="L200">    }</span>
+
+    @Override
+    public File generateCourseHtml(Long courseId) {
+
+<span class="nc" id="L205">        Configuration configuration = new Configuration(Configuration.getVersion());</span>
+        //最终的静态文件
+<span class="nc" id="L207">        File htmlFile = null;</span>
+        try {
+            //拿到classpath路径
+//            String classpath = this.getClass().getResource(&quot;/&quot;).getPath();
+//            //指定模板的目录
+//            configuration.setDirectoryForTemplateLoading(new File(classpath+&quot;/templates/&quot;));
+            //更改为如下方式
+<span class="nc" id="L214">            configuration.setTemplateLoader(new ClassTemplateLoader(this.getClass().getClassLoader(), &quot;/templates&quot;));</span>
+            //指定编码
+<span class="nc" id="L216">            configuration.setDefaultEncoding(&quot;utf-8&quot;);</span>
+
+            //得到模板
+<span class="nc" id="L219">            Template template = configuration.getTemplate(&quot;course_template.ftl&quot;);</span>
+            //准备数据
+<span class="nc" id="L221">            CoursePreviewDto coursePreviewInfo = this.getCoursePreviewInfo(courseId);</span>
+<span class="nc" id="L222">            HashMap&lt;String, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L223">            map.put(&quot;model&quot;, coursePreviewInfo);</span>
+
+            //Template template 模板, Object model 数据
+<span class="nc" id="L226">            String html = FreeMarkerTemplateUtils.processTemplateIntoString(template, map);</span>
+            //输入流
+<span class="nc" id="L228">            InputStream inputStream = IOUtils.toInputStream(html, &quot;utf-8&quot;);</span>
+<span class="nc" id="L229">            htmlFile = File.createTempFile(&quot;coursepublish&quot;, &quot;.html&quot;);</span>
+            //输出文件
+<span class="nc" id="L231">            FileOutputStream outputStream = new FileOutputStream(htmlFile);</span>
+            //使用流将html写入文件
+<span class="nc" id="L233">            IOUtils.copy(inputStream, outputStream);</span>
+<span class="nc" id="L234">        } catch (Exception ex) {</span>
+<span class="nc" id="L235">            log.error(&quot;页面静态化出现问题,课程id:{}&quot;, courseId, ex);</span>
+<span class="nc" id="L236">            ex.printStackTrace();</span>
+<span class="nc" id="L237">        }</span>
+
+<span class="nc" id="L239">        return htmlFile;</span>
+    }
+
+    @Override
+    public void uploadCourseHtml(Long courseId, File file) {
+        try {
+            //将file转成MultipartFile
+<span class="nc" id="L246">            MultipartFile multipartFile = MultipartSupportConfig.getMultipartFile(file);</span>
+            //远程调用得到返回值
+<span class="nc" id="L248">            String upload = mediaServiceClient.upload(multipartFile, &quot;course/&quot; + courseId + &quot;.html&quot;);</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">            if (upload == null) {</span>
+<span class="nc" id="L250">                log.debug(&quot;远程调用走降级逻辑得到上传的结果为null,课程id:{}&quot;, courseId);</span>
+<span class="nc" id="L251">                XueChengPlusException.cast(&quot;上传静态文件过程中存在异常&quot;);</span>
+            }
+<span class="nc" id="L253">        } catch (Exception ex) {</span>
+<span class="nc" id="L254">            ex.printStackTrace();</span>
+<span class="nc" id="L255">            XueChengPlusException.cast(&quot;上传静态文件过程中存在异常&quot;);</span>
+<span class="nc" id="L256">        }</span>
+
+<span class="nc" id="L258">    }</span>
+
+    /**
+     * @param courseId 课程id
+     * @return void
+     * @description 保存消息表记录
+     * @author Mr.M
+     * @date 2022/9/20 16:32
+     */
+    private void saveCoursePublishMessage(Long courseId) {
+
+<span class="nc" id="L269">        MqMessage mqMessage = mqMessageService.addMessage(&quot;course_publish&quot;, String.valueOf(courseId), null, null);</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        if (mqMessage == null) {</span>
+<span class="nc" id="L271">            XueChengPlusException.cast(CommonError.UNKOWN_ERROR);</span>
+        }
+
+<span class="nc" id="L274">    }</span>
+
+    /**
+     * 根据课程 id查询课程发布信息
+     *
+     * @param courseId
+     * @return
+     */
+    public CoursePublish getCoursePublish(Long courseId) {
+<span class="nc" id="L283">        CoursePublish coursePublish = coursePublishMapper.selectById(courseId);</span>
+<span class="nc" id="L284">        return coursePublish;</span>
+    }
+
+    //解决缓存穿透
+//    @Override
+//    public CoursePublish getCoursePublishCache(Long courseId) {
+//
+//
+//
+//        //从缓存中查询
+//        Object jsonObj = redisTemplate.opsForValue().get(&quot;course:&quot; + courseId);
+//        //缓存中有
+//        if(jsonObj!=null){
+////            System.out.println(&quot;=============从缓存中查询=============&quot;);
+//            //缓存中有直接返回数据
+//            String jsonString = jsonObj.toString();
+//            if(&quot;null&quot;.equals(jsonString)){
+//                return null;
+//            }
+//            CoursePublish coursePublish = JSON.parseObject(jsonString, CoursePublish.class);
+//            return coursePublish;
+//        }else{
+//            System.out.println(&quot;==查询数据库==&quot;);
+//            //从数据库查询
+//            CoursePublish coursePublish = getCoursePublish(courseId);
+////            if(coursePublish!=null){
+//                //查询完成再存储到redis
+//                redisTemplate.opsForValue().set(&quot;course:&quot;+courseId,JSON.toJSONString(coursePublish),30, TimeUnit.SECONDS);
+////            }
+//            return coursePublish;
+//        }
+//    }
+
+    //使用同步锁解决缓存击穿
+//    @Override
+//    public CoursePublish getCoursePublishCache(Long courseId) {
+//
+//
+//            //从缓存中查询
+//            Object jsonObj = redisTemplate.opsForValue().get(&quot;course:&quot; + courseId);
+//            //缓存中有
+//            if(jsonObj!=null){
+////            System.out.println(&quot;=============从缓存中查询=============&quot;);
+//                //缓存中有直接返回数据
+//                String jsonString = jsonObj.toString();
+//                if(&quot;null&quot;.equals(jsonString)){
+//                    return null;
+//                }
+//                CoursePublish coursePublish = JSON.parseObject(jsonString, CoursePublish.class);
+//                return coursePublish;
+//            }else{
+//                synchronized (this){
+//                    //再次查询一下缓存
+//                    //从缓存中查询
+//                    jsonObj = redisTemplate.opsForValue().get(&quot;course:&quot; + courseId);
+//                    //缓存中有
+//                    if(jsonObj!=null) {
+//                        //缓存中有直接返回数据
+//                        String jsonString = jsonObj.toString();
+//                        if(&quot;null&quot;.equals(jsonString)){
+//                            return null;
+//                        }
+//                        CoursePublish coursePublish = JSON.parseObject(jsonString, CoursePublish.class);
+//                        return coursePublish;
+//                    }
+//                    System.out.println(&quot;==查询数据库==&quot;);
+//                    //从数据库查询
+//                    CoursePublish coursePublish = getCoursePublish(courseId);
+//                    //查询完成再存储到redis
+//                    redisTemplate.opsForValue().set(&quot;course:&quot;+courseId,JSON.toJSONString(coursePublish),300, TimeUnit.SECONDS);
+//                    return coursePublish;
+//
+//                }
+//
+//
+//
+//            }
+
+    //使用redisson实现分布式锁
+    @Override
+    public CoursePublish getCoursePublishCache(Long courseId) {
+
+
+        //从缓存中查询
+<span class="nc" id="L368">        Object jsonObj = redisTemplate.opsForValue().get(&quot;course:&quot; + courseId);</span>
+        //缓存中有
+<span class="nc bnc" id="L370" title="All 2 branches missed.">        if (jsonObj != null) {</span>
+//            System.out.println(&quot;=============从缓存中查询=============&quot;);
+            //缓存中有直接返回数据
+<span class="nc" id="L373">            String jsonString = jsonObj.toString();</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">            if (&quot;null&quot;.equals(jsonString)) {</span>
+<span class="nc" id="L375">                return null;</span>
+            }
+<span class="nc" id="L377">            CoursePublish coursePublish = JSON.parseObject(jsonString, CoursePublish.class);</span>
+<span class="nc" id="L378">            return coursePublish;</span>
+        } else {
+<span class="nc" id="L380">            RLock lock = redissonClient.getLock(&quot;coursequerylock:&quot; + courseId);</span>
+            //获取分布式锁
+<span class="nc" id="L382">            lock.lock();</span>
+            try {
+                //再次查询一下缓存
+                //从缓存中查询
+<span class="nc" id="L386">                jsonObj = redisTemplate.opsForValue().get(&quot;course:&quot; + courseId);</span>
+                //缓存中有
+<span class="nc bnc" id="L388" title="All 2 branches missed.">                if (jsonObj != null) {</span>
+                    //缓存中有直接返回数据
+<span class="nc" id="L390">                    String jsonString = jsonObj.toString();</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">                    if (&quot;null&quot;.equals(jsonString)) {</span>
+<span class="nc" id="L392">                        return null;</span>
+                    }
+<span class="nc" id="L394">                    CoursePublish coursePublish = JSON.parseObject(jsonString, CoursePublish.class);</span>
+<span class="nc" id="L395">                    return coursePublish;</span>
+                }
+<span class="nc" id="L397">                System.out.println(&quot;==查询数据库==&quot;);</span>
+//                try {
+//                    //手动延迟，测试锁的续期功能
+//                    Thread.sleep(60000);
+//                } catch (InterruptedException e) {
+//                    throw new RuntimeException(e);
+//                }
+                //从数据库查询
+<span class="nc" id="L405">                CoursePublish coursePublish = getCoursePublish(courseId);</span>
+                //查询完成再存储到redis
+<span class="nc" id="L407">                redisTemplate.opsForValue().set(&quot;course:&quot; + courseId, JSON.toJSONString(coursePublish), 300, TimeUnit.SECONDS);</span>
+<span class="nc" id="L408">                return coursePublish;</span>
+
+            } finally {
+                //手动释放锁
+<span class="nc" id="L412">                lock.unlock();</span>
+            }
+        }
+
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

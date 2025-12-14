@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CoursePublishTask.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Content Service Coverage</a> &gt; <a href="index.source.html" class="el_package">com.xuecheng.content.service.jobhandler</a> &gt; <span class="el_source">CoursePublishTask.java</span></div><h1>CoursePublishTask.java</h1><pre class="source lang-java linenums">package com.xuecheng.content.service.jobhandler;
+
+import com.xuecheng.base.exception.XueChengPlusException;
+import com.xuecheng.content.feignclient.CourseIndex;
+import com.xuecheng.content.feignclient.SearchServiceClient;
+import com.xuecheng.content.mapper.CoursePublishMapper;
+import com.xuecheng.content.model.dto.CoursePreviewDto;
+import com.xuecheng.content.model.po.CoursePublish;
+import com.xuecheng.content.service.CoursePublishService;
+import com.xuecheng.messagesdk.model.po.MqMessage;
+import com.xuecheng.messagesdk.service.MessageProcessAbstract;
+import com.xuecheng.messagesdk.service.MqMessageService;
+import com.xxl.job.core.context.XxlJobHelper;
+import com.xxl.job.core.handler.annotation.XxlJob;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.io.File;
+
+/**
+ * @author Mr.M
+ * @version 1.0
+ * @description 课程发布的任务类
+ * @date 2023/2/21 16:15
+ */
+<span class="nc" id="L28">@Slf4j</span>
+@Component
+<span class="nc" id="L30">public class CoursePublishTask extends MessageProcessAbstract {</span>
+
+    @Autowired
+    CoursePublishService coursePublishService;
+
+    @Autowired
+    SearchServiceClient searchServiceClient;
+
+    @Autowired
+    CoursePublishMapper coursePublishMapper;
+
+    //任务调度入口
+    @XxlJob(&quot;CoursePublishJobHandler&quot;)
+    public void coursePublishJobHandler() throws Exception {
+
+        // 分片参数
+<span class="nc" id="L46">        int shardIndex = XxlJobHelper.getShardIndex();//执行器的序号，从0开始</span>
+<span class="nc" id="L47">        int shardTotal = XxlJobHelper.getShardTotal();//执行器总数</span>
+        //调用抽象类的方法执行任务
+<span class="nc" id="L49">        process(shardIndex,shardTotal, &quot;course_publish&quot;,30,60);</span>
+
+
+<span class="nc" id="L52">    }</span>
+
+    //执行课程发布任务的逻辑,如果此方法抛出异常说明任务执行失败
+    @Override
+    public boolean execute(MqMessage mqMessage) {
+        //从mqMessage拿到课程id
+<span class="nc" id="L58">        Long courseId = Long.parseLong(mqMessage.getBusinessKey1());</span>
+
+        //课程静态化上传到minio
+<span class="nc" id="L61">        generateCourseHtml(mqMessage,courseId);</span>
+
+
+        //向elasticsearch写索引数据
+<span class="nc" id="L65">        saveCourseIndex(mqMessage,courseId);</span>
+
+        //向redis写缓存
+
+        //返回true表示任务完成
+<span class="nc" id="L70">        return true;</span>
+    }
+    //生成课程静态化页面并上传至文件系统
+    private void generateCourseHtml(MqMessage mqMessage,long courseId){
+        //消息id
+<span class="nc" id="L75">        Long taskId = mqMessage.getId();</span>
+<span class="nc" id="L76">        MqMessageService mqMessageService = this.getMqMessageService();</span>
+
+        //做任务幂等性处理
+        //查询数据库取出该阶段执行状态
+<span class="nc" id="L80">        int stageOne = mqMessageService.getStageOne(taskId);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if(stageOne&gt;0){</span>
+<span class="nc" id="L82">           log.debug(&quot;课程静态化任务完成，无需处理...&quot;);</span>
+<span class="nc" id="L83">           return ;</span>
+        }
+
+
+        //开始进行课程静态化 生成html页面
+<span class="nc" id="L88">        File file = coursePublishService.generateCourseHtml(courseId);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if(file == null){</span>
+<span class="nc" id="L90">            XueChengPlusException.cast(&quot;生成的静态页面为空&quot;);</span>
+        }
+        // 将html上传到minio
+<span class="nc" id="L93">        coursePublishService.uploadCourseHtml(courseId,file);</span>
+
+        //..任务处理完成写任务状态为完成
+<span class="nc" id="L96">        mqMessageService.completedStageOne(taskId);</span>
+
+
+<span class="nc" id="L99">    }</span>
+
+    //保存课程索引信息 第二个阶段任务
+    private void saveCourseIndex(MqMessage mqMessage,long courseId){
+        //任务id
+<span class="nc" id="L104">        Long taskId = mqMessage.getId();</span>
+<span class="nc" id="L105">        MqMessageService mqMessageService = this.getMqMessageService();</span>
+        //取出第二个阶段状态
+<span class="nc" id="L107">        int stageTwo = mqMessageService.getStageTwo(taskId);</span>
+
+        //任务幂等性处理
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if(stageTwo&gt;0){</span>
+<span class="nc" id="L111">            log.debug(&quot;课程索引信息已写入，无需执行...&quot;);</span>
+<span class="nc" id="L112">            return;</span>
+        }
+        //查询课程信息，调用搜索服务添加索引接口
+        //从课程发布表查询课程信息
+<span class="nc" id="L116">        CoursePublish coursePublish = coursePublishMapper.selectById(courseId);</span>
+
+<span class="nc" id="L118">        CourseIndex courseIndex = new CourseIndex();</span>
+<span class="nc" id="L119">        BeanUtils.copyProperties(coursePublish,courseIndex);</span>
+        //远程调用
+<span class="nc" id="L121">        Boolean add = searchServiceClient.add(courseIndex);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if(!add){</span>
+<span class="nc" id="L123">            XueChengPlusException.cast(&quot;远程调用搜索服务添加课程索引失败&quot;);</span>
+        }
+
+        //完成本阶段的任务
+<span class="nc" id="L127">        mqMessageService.completedStageTwo(taskId);</span>
+
+
+<span class="nc" id="L130">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

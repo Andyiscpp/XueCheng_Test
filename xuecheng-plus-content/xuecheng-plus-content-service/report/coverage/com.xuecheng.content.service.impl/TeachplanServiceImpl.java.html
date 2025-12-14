@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TeachplanServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Content Service Coverage</a> &gt; <a href="index.source.html" class="el_package">com.xuecheng.content.service.impl</a> &gt; <span class="el_source">TeachplanServiceImpl.java</span></div><h1>TeachplanServiceImpl.java</h1><pre class="source lang-java linenums">package com.xuecheng.content.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.xuecheng.base.exception.XueChengPlusException;
+import com.xuecheng.content.mapper.TeachplanMapper;
+import com.xuecheng.content.mapper.TeachplanMediaMapper;
+import com.xuecheng.content.model.dto.BindTeachplanMediaDto;
+import com.xuecheng.content.model.dto.SaveTeachplanDto;
+import com.xuecheng.content.model.dto.TeachplanDto;
+import com.xuecheng.content.model.po.Teachplan;
+import com.xuecheng.content.model.po.TeachplanMedia;
+import com.xuecheng.content.service.TeachplanService;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+/**
+ * @author Mr.M
+ * @version 1.0
+ * @description TODO
+ * @date 2023/2/14 12:11
+ */
+@Service
+<span class="nc" id="L27">public class TeachplanServiceImpl implements TeachplanService {</span>
+
+    @Autowired
+    TeachplanMapper teachplanMapper;
+
+    @Autowired
+    TeachplanMediaMapper teachplanMediaMapper;
+
+    @Override
+    public List&lt;TeachplanDto&gt; findTeachplanTree(Long courseId) {
+<span class="nc" id="L37">        List&lt;TeachplanDto&gt; teachplanDtos = teachplanMapper.selectTreeNodes(courseId);</span>
+<span class="nc" id="L38">        return teachplanDtos;</span>
+    }
+
+    private int getTeachplanCount(Long courseId,Long parentId){
+<span class="nc" id="L42">        LambdaQueryWrapper&lt;Teachplan&gt; queryWrapper = new LambdaQueryWrapper&lt;&gt;();</span>
+<span class="nc" id="L43">        queryWrapper = queryWrapper.eq(Teachplan::getCourseId, courseId).eq(Teachplan::getParentid, parentId);</span>
+<span class="nc" id="L44">        Integer count = teachplanMapper.selectCount(queryWrapper);</span>
+<span class="nc" id="L45">        return  count+1;</span>
+    }
+    @Override
+    public void saveTeachplan(SaveTeachplanDto saveTeachplanDto) {
+        //通过课程计划id判断是新增和修改
+<span class="nc" id="L50">        Long teachplanId = saveTeachplanDto.getId();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if(teachplanId ==null){</span>
+            //新增
+<span class="nc" id="L53">            Teachplan teachplan = new Teachplan();</span>
+<span class="nc" id="L54">            BeanUtils.copyProperties(saveTeachplanDto,teachplan);</span>
+            //确定排序字段，找到它的同级节点个数，排序字段就是个数加1  select count(1) from teachplan where course_id=117 and parentid=268
+<span class="nc" id="L56">            Long parentid = saveTeachplanDto.getParentid();</span>
+<span class="nc" id="L57">            Long courseId = saveTeachplanDto.getCourseId();</span>
+<span class="nc" id="L58">            int teachplanCount = getTeachplanCount(courseId, parentid);</span>
+<span class="nc" id="L59">            teachplan.setOrderby(teachplanCount);</span>
+<span class="nc" id="L60">            teachplanMapper.insert(teachplan);</span>
+
+<span class="nc" id="L62">        }else{</span>
+            //修改
+<span class="nc" id="L64">            Teachplan teachplan = teachplanMapper.selectById(teachplanId);</span>
+            //将参数复制到teachplan
+<span class="nc" id="L66">            BeanUtils.copyProperties(saveTeachplanDto,teachplan);</span>
+<span class="nc" id="L67">            teachplanMapper.updateById(teachplan);</span>
+        }
+
+<span class="nc" id="L70">    }</span>
+
+    @Transactional
+    @Override
+    public void associationMedia(BindTeachplanMediaDto bindTeachplanMediaDto) {
+        //课程计划id
+<span class="nc" id="L76">        Long teachplanId = bindTeachplanMediaDto.getTeachplanId();</span>
+<span class="nc" id="L77">        Teachplan teachplan = teachplanMapper.selectById(teachplanId);</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if(teachplan == null){</span>
+<span class="nc" id="L79">            XueChengPlusException.cast(&quot;课程计划不存在&quot;);</span>
+        }
+
+        //先删除原有记录,根据课程计划id删除它所绑定的媒资
+<span class="nc" id="L83">        int delete = teachplanMediaMapper.delete(new LambdaQueryWrapper&lt;TeachplanMedia&gt;().eq(TeachplanMedia::getTeachplanId, bindTeachplanMediaDto.getTeachplanId()));</span>
+
+        //再添加新记录
+<span class="nc" id="L86">        TeachplanMedia teachplanMedia = new TeachplanMedia();</span>
+<span class="nc" id="L87">        BeanUtils.copyProperties(bindTeachplanMediaDto,teachplanMedia);</span>
+<span class="nc" id="L88">        teachplanMedia.setCourseId(teachplan.getCourseId());</span>
+<span class="nc" id="L89">        teachplanMedia.setMediaFilename(bindTeachplanMediaDto.getFileName());</span>
+<span class="nc" id="L90">        teachplanMediaMapper.insert(teachplanMedia);</span>
+
+<span class="nc" id="L92">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

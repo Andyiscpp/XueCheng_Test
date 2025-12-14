@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XxlJobConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Content Service Coverage</a> &gt; <a href="index.source.html" class="el_package">com.xuecheng.content.config</a> &gt; <span class="el_source">XxlJobConfig.java</span></div><h1>XxlJobConfig.java</h1><pre class="source lang-java linenums">package com.xuecheng.content.config;
+
+import com.xxl.job.core.executor.impl.XxlJobSpringExecutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * xxl-job config
+ *
+ * @author xuxueli 2017-04-28
+ */
+@Configuration
+<span class="nc" id="L16">public class XxlJobConfig {</span>
+<span class="nc" id="L17">    private Logger logger = LoggerFactory.getLogger(XxlJobConfig.class);</span>
+
+    @Value(&quot;${xxl.job.admin.addresses}&quot;)
+    private String adminAddresses;
+
+    @Value(&quot;${xxl.job.accessToken}&quot;)
+    private String accessToken;
+
+    @Value(&quot;${xxl.job.executor.appname}&quot;)
+    private String appname;
+
+    @Value(&quot;${xxl.job.executor.address}&quot;)
+    private String address;
+
+    @Value(&quot;${xxl.job.executor.ip}&quot;)
+    private String ip;
+
+    @Value(&quot;${xxl.job.executor.port}&quot;)
+    private int port;
+
+    @Value(&quot;${xxl.job.executor.logpath}&quot;)
+    private String logPath;
+
+    @Value(&quot;${xxl.job.executor.logretentiondays}&quot;)
+    private int logRetentionDays;
+
+
+    @Bean
+    public XxlJobSpringExecutor xxlJobExecutor() {
+<span class="nc" id="L46">        logger.info(&quot;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; xxl-job config init.&quot;);</span>
+<span class="nc" id="L47">        XxlJobSpringExecutor xxlJobSpringExecutor = new XxlJobSpringExecutor();</span>
+<span class="nc" id="L48">        xxlJobSpringExecutor.setAdminAddresses(adminAddresses);</span>
+<span class="nc" id="L49">        xxlJobSpringExecutor.setAppname(appname);</span>
+<span class="nc" id="L50">        xxlJobSpringExecutor.setAddress(address);</span>
+<span class="nc" id="L51">        xxlJobSpringExecutor.setIp(ip);</span>
+<span class="nc" id="L52">        xxlJobSpringExecutor.setPort(port);</span>
+<span class="nc" id="L53">        xxlJobSpringExecutor.setAccessToken(accessToken);</span>
+<span class="nc" id="L54">        xxlJobSpringExecutor.setLogPath(logPath);</span>
+<span class="nc" id="L55">        xxlJobSpringExecutor.setLogRetentionDays(logRetentionDays);</span>
+
+<span class="nc" id="L57">        return xxlJobSpringExecutor;</span>
+    }
+
+    /**
+     * 针对多网卡、容器内部署等情况，可借助 &quot;spring-cloud-commons&quot; 提供的 &quot;InetUtils&quot; 组件灵活定制注册IP；
+     *
+     *      1、引入依赖：
+     *          &lt;dependency&gt;
+     *             &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+     *             &lt;artifactId&gt;spring-cloud-commons&lt;/artifactId&gt;
+     *             &lt;version&gt;${version}&lt;/version&gt;
+     *         &lt;/dependency&gt;
+     *
+     *      2、配置文件，或者容器启动变量
+     *          spring.cloud.inetutils.preferred-networks: 'xxx.xxx.xxx.'
+     *
+     *      3、获取IP
+     *          String ip_ = inetUtils.findFirstNonLoopbackHostInfo().getIpAddress();
+     */
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
